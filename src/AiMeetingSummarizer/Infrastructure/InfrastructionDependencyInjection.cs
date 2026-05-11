@@ -1,4 +1,7 @@
-﻿using AiMeetingSummarizer.Application.Interfaces;
+﻿// Copyright (c) 2026 Vladimir Goryunov https://github.com/vladimir-goryunov
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using AiMeetingSummarizer.Application.Interfaces;
 using AiMeetingSummarizer.Infrastructure.IO;
 using AiMeetingSummarizer.Infrastructure.Ollama;
 using AiMeetingSummarizer.Infrastructure.Processing;
@@ -23,9 +26,10 @@ public static class InfrastructionDependencyInjection
     /// <returns>The IServiceCollection instance for method chaining.</returns>
     /// <remarks>
     /// Registered services include:
-    /// - OllamaSettings (Options pattern with validation)
-    /// - OutputSettings (Options pattern with validation)
+    /// - OllamaSettings (Options pattern with data annotation validation)
+    /// - OutputSettings (Options pattern with data annotation validation)
     /// - HTTP client for Ollama API
+    /// - IOllamaHealthChecker (OllamaHealthChecker) - pre-flight check before processing
     /// - IInputProvider (FileInputProvider)
     /// - ITextPreprocessor (TextPreprocessor)
     /// - ConsoleOutputWriter, FileOutputWriter, and CompositeOutputWriter
@@ -48,12 +52,20 @@ public static class InfrastructionDependencyInjection
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
-        // HTTP client
+        // HTTP client shared by OllamaApiClient and OllamaHealthChecker
         services.AddHttpClient<IOllamaApiClient, OllamaApiClient>((sp, client) =>
         {
             var settings = sp.GetRequiredService<IOptions<OllamaSettings>>().Value;
             client.BaseAddress = new Uri(settings.BaseUrl);
             client.Timeout = TimeSpan.FromSeconds(settings.TimeoutSeconds);
+        });
+
+        services.AddHttpClient<IOllamaHealthChecker, OllamaHealthChecker>((sp, client) =>
+        {
+            var settings = sp.GetRequiredService<IOptions<OllamaSettings>>().Value;
+            client.BaseAddress = new Uri(settings.BaseUrl);
+            // Health check uses a short fixed timeout - independently of inference timeout
+            client.Timeout = TimeSpan.FromSeconds(15);
         });
 
         // IO services

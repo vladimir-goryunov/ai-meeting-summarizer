@@ -1,30 +1,65 @@
 # AI Meeting Summarizer
 
-A .NET 8 console application that automatically generates structured summaries from meeting transcripts using a local large language model via [Ollama](https://ollama.com). All processing happens locally - no data leaves your machine
+![.NET](https://img.shields.io/badge/.NET-512BD4?logo=dotnet&logoColor=fff)
+![C#](https://custom-icon-badges.demolab.com/badge/C%23-%23239120.svg?logo=cshrp&logoColor=white)
+![Ollama](https://img.shields.io/badge/Ollama-000000?logo=ollama&logoColor=white)
+![License MIT](https://img.shields.io/badge/License-MIT-green.svg)
+
+A .NET 8 console application that automatically generates structured summaries from meeting transcripts using a local large language model via [Ollama](https://ollama.com). All processing happens locally — no data leaves your machine.
 
 ## Features
 
 - Accepts plain-text transcripts or structured JSON transcript formats (e.g., Whisper output)
 - Generates structured summaries: participants, per-person status, action items
 - Evaluates summary quality using an LLM-as-a-Judge approach with a five-criterion rubric
+- Pre-flight health check: verifies Ollama is running and the model is installed before processing begins
 - Outputs results to both the console and a Markdown file
-- Fully local inference - suitable for NDA-sensitive content
+- Fully local inference — suitable for NDA-sensitive content
 
-## Architecture
+## Project Structure
 
-The solution follows Clean Architecture principles with the pipeline structured as:
+The solution follows Clean Architecture.
+Logical layers are namespaces within a single project — no separate assembly per layer.
 
 ```
-Read -> Preprocess -> Summarize -> Evaluate -> Write
+AiMeetingSummarizer/
+│
+├── src/AiMeetingSummarizer/
+│   │
+│   ├── Domain/                         # Core models — no dependencies on other layers
+│   │
+│   ├── Application/
+│   │   └── Interfaces/                 # Contracts: ISummarizer, IEvaluator, IOutputWriter, …
+│   │                                   # MeetingAnalysisOrchestrator lives here
+│   │
+│   ├── Infrastructure/
+│   │   ├── Ollama/                     # Ollama API client, summarizer, evaluator, health check
+│   │   │   └── Models/                 # JSON request/response DTOs (internal)
+│   │   ├── IO/                         # File reader, console writer, Markdown writer, composite
+│   │   ├── Processing/                 # Text normalisation and transcript format detection
+│   │   └── Templates/                  # Prompt templates (.txt, loaded at build time)
+│   │
+│   └── Presentation/                   # Entry point, CLI parsing, bootstrapper, exit codes
+│
+├── tests/AiMeetingSummarizer.Tests/
+│   └── Unit/                           # Fast, isolated unit tests — no network, no disk I/O
+│
+├── results/                            # Sample runs with different models (llama3, phi4, qwen2.5)
+│
+└── samples/                            # Example transcripts (plain text and JSON formats)
 ```
 
-Logical layers are organized as namespaces within a single project:
+The pipeline executed by `MeetingAnalysisOrchestrator` on every run:
+
+```
+Read → Preprocess → Summarize → Evaluate → Write
+```
 
 | Namespace | Responsibility |
 |---|---|
 | `Domain` | Core models (`SummaryResult`, `EvaluationResult`) |
 | `Application` | Pipeline interfaces and orchestrator |
-| `Infrastructure.Ollama` | Ollama API client, summarizer, evaluator |
+| `Infrastructure.Ollama` | Ollama API client, summarizer, evaluator, health check |
 | `Infrastructure.IO` | File reader, console writer, file writer |
 | `Infrastructure.Processing` | Text normalization and transcript format detection |
 
@@ -36,17 +71,14 @@ Logical layers are organized as namespaces within a single project:
 
 ### Recommended models
 
-The following models are recommended based on a balance of quality and performance on consumer hardware:
-
 | Model | Size | Command |
 |---|---|---|
-| `qwen2.5:7b-instruct` | ~4.7 GB | `ollama pull qwen2.5` |
-| `phi4: latest` | ~9.1 GB | `ollama pull phi4` |
-| `llama3: latest` | ~4.7 GB | `ollama pull llama3` |
+| `qwen2.5:7b-instruct` | ~4.7 GB | `ollama pull qwen2.5:7b-instruct` |
+| `phi4:latest` | ~9.1 GB | `ollama pull phi4` |
+| `llama3:latest` | ~4.7 GB | `ollama pull llama3` |
 | `mistral` | ~4.1 GB | `ollama pull mistral` |
 
-
-> For machines with limited VRAM, `mistral` is a lighter alternative.
+> For machines with limited VRAM, `qwen2.5:7b-instruct` or `mistral` are lighter alternatives.
 
 ## Quick Start
 
@@ -59,36 +91,64 @@ cd ai-meeting-summarizer
 ollama serve
 
 # 3. Pull the default model
-ollama pull llama3
+ollama pull qwen2.5:7b-instruct
 
-# 4. Run against a transcript
-dotnet run --project src/AiMeetingSummarizer -- samples/sample-status-meeting.txt
+# 4. Navigate to the project directory and run
+cd src/AiMeetingSummarizer
+dotnet run -- --input "..\..\samples\sample-status-meeting.txt"
 ```
 
-The summary is printed to the console and saved to `sumamry.md` in the working directory.
+The summary is printed to the console and saved to `summary.md` in the working directory.
 
 ## Usage
 
 ```
-AiMeetingSummarizer <path-to-transcript> [output-file]
+AiMeetingSummarizer --input <path> [--output <path>] [--verbose] [--no-color]
 ```
 
-| Argument | Description |
-|---|---|
-| `path-to-transcript` | Path to the `.txt` or `.json` transcript file (required) |
-| `output-file` | Path for the Markdown output file (optional, default: `summary.md`) |
+| Option | Short | Description |
+|---|---|---|
+| `--input` | `-i` | Path to the `.txt` or `.json` transcript file **(required)** |
+| `--output` | `-o` | Path for the Markdown output file (default: `summary.md`) |
+| `--verbose` | `-v` | Enable verbose output |
+| `--no-color` | | Disable colored console output |
 
-**Examples:**
+### Run with `dotnet run` (from `src/AiMeetingSummarizer`)
 
+```bash
+# Minimal
+dotnet run -- --input "..\..\samples\sample-status-meeting.txt"
+
+# With output file and verbose logging
+dotnet run -- --input "..\..\samples\sample-technical-meeting.json" --output report.md --verbose
+
+# Short form
+dotnet run -- -i "..\..\samples\sample-technical-meeting.json" -v
 ```
-# Use default output path
-dotnet run --project src/AiMeetingSummarizer -- meeting.txt
 
-# Specify custom output path
-dotnet run --project src/AiMeetingSummarizer -- meeting.txt reports/2025-01-15.md
+### Run the compiled binary
 
-# Run the compiled binary directly
-./AiMeetingSummarizer meeting.txt
+First build the project:
+
+```bash
+# Release build (recommended)
+dotnet build -c Release
+
+# Debug build
+dotnet build -c Debug
+```
+
+Then run the binary directly:
+
+```bash
+# Release
+bin\Release\net8.0\AiMeetingSummarizer.exe --input "..\..\samples\sample-technical-meeting.json" --verbose
+
+# Debug
+bin\Debug\net8.0\AiMeetingSummarizer.exe --input "..\..\samples\sample-technical-meeting.json" --verbose
+
+# With custom output path
+bin\Release\net8.0\AiMeetingSummarizer.exe --input meeting.txt --output reports\2025-01-15.md
 ```
 
 ## Input Format
@@ -98,7 +158,7 @@ The application accepts two transcript formats:
 **Plain text dialogue:**
 ```
 John: Let's start with the API issue from yesterday.
-Anna: I checked the logs - there are a lot of timeout errors.
+Anna: I checked the logs — there are a lot of timeout errors.
 Mike: Could be a database bottleneck.
 ```
 
@@ -114,9 +174,9 @@ JSON input is automatically detected and converted to plain dialogue before proc
 
 ## Output Format
 
-**Console output** - formatted ASCII table with summary and evaluation scores.
+**Console output** — formatted ASCII table with summary and evaluation scores.
 
-**Markdown file** - structured document with a quality evaluation table:
+**Markdown file** — structured document with a quality evaluation table:
 
 ```markdown
 # Meeting Summary
@@ -158,7 +218,7 @@ Settings are controlled via `appsettings.json`:
 {
   "Ollama": {
     "BaseUrl": "http://localhost:11434",
-    "ModelName": "llama3",
+    "ModelName": "qwen2.5:7b-instruct",
     "TimeoutSeconds": 180
   },
   "Output": {
@@ -167,18 +227,20 @@ Settings are controlled via `appsettings.json`:
 }
 ```
 
+The `--output` CLI argument takes priority over `Output:FilePath` in `appsettings.json`.
+
 ## Running Tests
 
-```
+```bash
 dotnet test
 ```
 
-Test coverage targets >90% for all new classes. Tests are organized as unit tests only (`*UnitTest`) using xUnit and Moq.
-
-```
+```bash
 # With coverage report
 dotnet test --collect:"XPlat Code Coverage"
 ```
+
+Test coverage targets >90% for all new classes. Tests are organized as unit tests only (`*UnitTest`) using xUnit, Moq, and FluentAssertions.
 
 ## Quality Evaluation Rubric
 
@@ -198,12 +260,26 @@ The LLM-as-a-Judge evaluator scores summaries on five criteria (0–2 each):
 - 5–6: Acceptable
 - < 5: Needs Improvement
 
+## Exit Codes
+
+| Code | Meaning |
+|---|---|
+| 0 | Success |
+| 1 | Invalid arguments |
+| 2 | Operation cancelled (Ctrl+C) |
+| 3 | Input file not found |
+| 4 | Ollama service error during inference |
+| 5 | Unexpected error |
+| 6 | Ollama not reachable — run `ollama serve` |
+| 7 | Model not installed — run `ollama pull <model>` |
+| 8 | Invalid configuration — check `appsettings.json` |
+
 ## Limitations
 
-- Text input only - audio transcription is not supported yet
+- Text input only — audio transcription is not supported
 - No speaker diarization for unmarked transcripts
 - Context window bounded by the chosen model (typically 4k–8k tokens)
-- Long transcripts may be truncated; chunking is not implemented yet
+- Long transcripts may be truncated; chunking is not implemented
 
 ## Future Directions
 

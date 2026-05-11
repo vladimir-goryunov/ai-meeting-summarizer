@@ -1,4 +1,7 @@
-﻿using AiMeetingSummarizer.Application;
+﻿// Copyright (c) 2026 Vladimir Goryunov https://github.com/vladimir-goryunov
+// Licensed under the MIT License. See LICENSE in the project root for license information.
+
+using AiMeetingSummarizer.Application;
 using AiMeetingSummarizer.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;

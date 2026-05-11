@@ -2,7 +2,8 @@
   "profiles": {
     "AiMeetingSummarizer": {
       "commandName": "Project",
-      "commandLineArgs": ""
+      "commandLineArgs": "--input \"samples\\sample-technical-meeting.json\" --verbose",
+      "workingDirectory": "$(SolutionDir)"
     }
   }
 }
