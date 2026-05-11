@@ -1,0 +1,57 @@
+## .NET / C#
+bin/
+obj/
+*.user
+*.suo
+*.userprefs
+.vs/
+_ReSharper*/
+*.resharper
+*.DotSettings.user
+
+## Build outputs
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+## NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+## Test results
+TestResults/
+*.trx
+*.coveragexml
+coverage*.xml
+coverage/
+
+## OS artifacts
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+## Output files
+summary.md
+
+## IDE
+.idea/
+*.iml
+.fleet/
+
+## Environment overrides
+.env
+appsettings.*.json
+!appsettings.json

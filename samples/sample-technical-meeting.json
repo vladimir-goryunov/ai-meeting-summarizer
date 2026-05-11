@@ -1,0 +1,23 @@
+[
+  { "start": 0.0,  "end": 4.5,  "speaker": "John", "text": "So, before we start, just to recap what happened yesterday — we had some issues in production, right?" },
+  { "start": 5.2,  "end": 8.6,  "speaker": "Anna", "text": "Yes, although it wasn't immediately clear what exactly was failing." },
+  { "start": 9.3,  "end": 12.9, "speaker": "Mike", "text": "There were complaints from users that orders were not being processed." },
+  { "start": 13.6, "end": 17.8, "speaker": "Anna", "text": "At first I thought it might be a frontend issue, but logs suggest backend problems." },
+  { "start": 18.5, "end": 19.9, "speaker": "John", "text": "And specifically?" },
+  { "start": 20.6, "end": 23.8, "speaker": "Anna", "text": "Mostly timeouts, especially around database queries." },
+  { "start": 24.5, "end": 27.2, "speaker": "Mike", "text": "Yeah, I saw some retries happening as well." },
+  { "start": 27.9, "end": 31.3, "speaker": "John", "text": "Do we know if this is definitely caused by the last deployment?" },
+  { "start": 32.0, "end": 34.6, "speaker": "Anna", "text": "Not 100%, but it's very likely." },
+  { "start": 42.0, "end": 46.1, "speaker": "John", "text": "Regarding the notification feature, I feel like we are slightly behind." },
+  { "start": 46.8, "end": 50.0, "speaker": "Mike", "text": "Backend is done, but frontend still needs work." },
+  { "start": 50.7, "end": 53.4, "speaker": "Anna", "text": "We originally planned to release it this week, right?" },
+  { "start": 54.1, "end": 58.6, "speaker": "John", "text": "Yes, but we might need to adjust depending on frontend readiness." },
+  { "start": 59.3, "end": 62.4, "speaker": "Mike", "text": "I'll talk to them and see what's realistic." },
+  { "start": 63.9, "end": 68.2, "speaker": "John", "text": "Also, about testing — we've been postponing improvements for too long." },
+  { "start": 68.9, "end": 70.3, "speaker": "Anna", "text": "Agreed." },
+  { "start": 71.0, "end": 73.5, "speaker": "Mike", "text": "Yeah, but we always prioritize features." },
+  { "start": 77.1, "end": 80.2, "speaker": "Anna", "text": "Maybe we can at least cover the critical paths." },
+  { "start": 80.9, "end": 82.5, "speaker": "Mike", "text": "I can start with that." },
+  { "start": 84.0, "end": 88.5, "speaker": "John", "text": "So, next steps are basically investigation, coordination, and improving tests." },
+  { "start": 93.2, "end": 95.0, "speaker": "John", "text": "Alright, let's close." }
+]

@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "AiMeetingSummarizer": {
+      "commandName": "Project",
+      "commandLineArgs": ""
+    }
+  }
+}
