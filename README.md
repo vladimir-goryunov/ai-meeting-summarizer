@@ -220,10 +220,20 @@ Settings are controlled via `appsettings.json`:
   "Ollama": {
     "BaseUrl": "http://localhost:11434",
     "ModelName": "qwen2.5:7b-instruct",
-    "TimeoutSeconds": 180
+    "TimeoutSeconds": 180,
+    "Temperature": 0.0,
+    "Seed": 42
   },
   "Output": {
     "FilePath": "summary.md"
+  },
+  "Logging": {
+    "FilePath": "logs/app-.log",
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft": "Warning",
+      "System": "Warning"
+    }
   }
 }
 ```
