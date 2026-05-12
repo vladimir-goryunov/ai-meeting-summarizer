@@ -1,5 +1,5 @@
-﻿// Copyright (c) 2026 Vladimir Goryunov https://github.com/vladimir-goryunov
-// Licensed under the MIT License. See LICENSE in the project root for license information.
+﻿// Copyright (c) 2026 Vladimir Goryunov
+// SPDX-License-Identifier: MIT
 
 using AiMeetingSummarizer.Application.Interfaces;
 using AiMeetingSummarizer.Domain;
@@ -24,20 +24,22 @@ public sealed class CompositeOutputWriter : IOutputWriter
     /// <summary>
     /// Initializes a new instance of the <see cref="CompositeOutputWriter"/> class.
     /// </summary>
-    /// <param name="writers">Collection of output writers to composite together.</param>
-    /// <exception cref="ArgumentNullException">Thrown when writers is null.</exception>
-    /// <exception cref="ArgumentException">Thrown when writers collection is empty.</exception>
+    /// <param name="writers">Collection of output writers to delegate to.</param>
     public CompositeOutputWriter(IReadOnlyList<IOutputWriter> writers)
     {
         _writers = writers;
     }
 
     /// <inheritdoc />
-    public async Task WriteAsync(SummaryResult summary, EvaluationResult evaluation, CancellationToken cancellationToken = default)
+    public async Task WriteAsync(
+        SummaryResult summary,
+        EvaluationResult evaluation,
+        RunStatistics statistics,
+        CancellationToken cancellationToken = default)
     {
         foreach (var writer in _writers)
         {
-            await writer.WriteAsync(summary, evaluation, cancellationToken);
+            await writer.WriteAsync(summary, evaluation, statistics, cancellationToken);
         }
     }
 }

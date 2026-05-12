@@ -1,7 +1,9 @@
-﻿// Copyright (c) 2026 Vladimir Goryunov https://github.com/vladimir-goryunov
-// Licensed under the MIT License. See LICENSE in the project root for license information.
+﻿// Copyright (c) 2026 Vladimir Goryunov
+// SPDX-License-Identifier: MIT
 
+using System.Diagnostics;
 using AiMeetingSummarizer.Application.Interfaces;
+using AiMeetingSummarizer.Domain;
 using Microsoft.Extensions.Logging;
 
 namespace AiMeetingSummarizer.Application;
@@ -20,14 +22,8 @@ public sealed class MeetingAnalysisOrchestrator
     private readonly ILogger<MeetingAnalysisOrchestrator> _logger;
 
     /// <summary>
-    /// Initializes new instance of MeetingAnalysisOrchestrator
+    /// Initializes a new instance of <see cref="MeetingAnalysisOrchestrator"/>.
     /// </summary>
-    /// <param name="inputProvider">Provide raw meeting transcript text from a source.</param>
-    /// <param name="preprocessor">Handles entry transcript formats.</param>
-    /// <param name="summarizer">Generates structured meeting summaries by sending the transcript to a local Ollama model.</param>
-    /// <param name="evaluator">Evaluates summary quality.</param>
-    /// <param name="outputWriter">Writes the summary and evaluation results</param>
-    /// <param name="logger">Writes the log of configured type</param>
     public MeetingAnalysisOrchestrator(
         IInputProvider inputProvider,
         ITextPreprocessor preprocessor,
@@ -60,17 +56,29 @@ public sealed class MeetingAnalysisOrchestrator
         _logger.LogDebug("Preprocessing complete. Cleaned length: {Length} characters", cleanText.Length);
 
         _logger.LogInformation("Generating summary...");
+        var summaryWatch = Stopwatch.StartNew();
         var summary = await _summarizer.SummarizeAsync(cleanText, cancellationToken);
+        summaryWatch.Stop();
+        _logger.LogInformation("Summary generated in {Elapsed:0.0}s", summaryWatch.Elapsed.TotalSeconds);
 
         _logger.LogInformation("Evaluating summary quality...");
+        var evalWatch = Stopwatch.StartNew();
         var evaluation = await _evaluator.EvaluateAsync(cleanText, summary.Content, cancellationToken);
+        evalWatch.Stop();
+        _logger.LogInformation(
+            "Evaluation complete in {Elapsed:0.0}s. Score: {Score}/{Max} ({Grade})",
+            evalWatch.Elapsed.TotalSeconds, evaluation.TotalScore, evaluation.MaxTotalScore, evaluation.Grade);
+
+        var statistics = new RunStatistics
+        {
+            SummarizationDuration = summaryWatch.Elapsed,
+            EvaluationDuration = evalWatch.Elapsed
+        };
+
+        await _outputWriter.WriteAsync(summary, evaluation, statistics, cancellationToken);
 
         _logger.LogInformation(
-            "Evaluation complete. Score: {Score}/{Max} ({Grade})",
-            evaluation.TotalScore, evaluation.MaxTotalScore, evaluation.Grade);
-
-        await _outputWriter.WriteAsync(summary, evaluation, cancellationToken);
-
-        _logger.LogInformation("Analysis complete");
+            "Analysis complete. Total inference time: {Total:0.0}s",
+            statistics.TotalDuration.TotalSeconds);
     }
 }

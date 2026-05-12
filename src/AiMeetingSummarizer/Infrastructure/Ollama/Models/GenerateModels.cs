@@ -1,5 +1,5 @@
-﻿// Copyright (c) 2026 Vladimir Goryunov https://github.com/vladimir-goryunov
-// Licensed under the MIT License. See LICENSE in the project root for license information.
+﻿// Copyright (c) 2026 Vladimir Goryunov
+// SPDX-License-Identifier: MIT
 
 using System.Text.Json.Serialization;
 
@@ -122,7 +122,7 @@ internal sealed record GenerateOptions
     /// - 0.9 - 1.0: Highly random, may produce hallucinations
     /// </remarks>
     [JsonPropertyName("temperature")]
-    public double Temperature { get; init; } = 0.1;
+    public double Temperature { get; init; } = 0.0;
 
     /// <summary>
     /// Gets or sets the maximum number of tokens to generate in the response.
@@ -147,6 +147,14 @@ internal sealed record GenerateOptions
     /// </remarks>
     [JsonPropertyName("num_predict")]
     public int NumPredict { get; init; } = 2048;
+
+    /// <summary>
+    /// Random seed for reproducible output. Null means non-deterministic.
+    /// When set, produces identical results for the same prompt and parameters.
+    /// Most relevant when Temperature &gt; 0.0; at 0.0 output is already near-deterministic.
+    /// </summary>
+    [JsonPropertyName("seed")]
+    public int? Seed { get; init; }
 }
 
 /// <summary>

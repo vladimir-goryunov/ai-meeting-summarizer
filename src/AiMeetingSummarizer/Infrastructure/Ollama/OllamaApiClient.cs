@@ -1,5 +1,5 @@
-﻿// Copyright (c) 2026 Vladimir Goryunov https://github.com/vladimir-goryunov
-// Licensed under the MIT License. See LICENSE in the project root for license information.
+﻿// Copyright (c) 2026 Vladimir Goryunov
+// SPDX-License-Identifier: MIT
 
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -66,10 +66,17 @@ public sealed class OllamaApiClient : IOllamaApiClient
             Model = _settings.ModelName,
             Prompt = prompt,
             Stream = false,
-            Options = new GenerateOptions { Temperature = 0.1, NumPredict = 2048 }
+            Options = new GenerateOptions
+            {
+                Temperature = _settings.Temperature,
+                NumPredict = 2048,
+                Seed = _settings.Seed
+            }
         };
 
-        _logger.LogDebug("Sending generate request to Ollama. Model: {Model}", _settings.ModelName);
+        _logger.LogDebug(
+            "Sending generate request. Model: {Model}, Temperature: {Temperature}, Seed: {Seed}",
+            _settings.ModelName, _settings.Temperature, _settings.Seed?.ToString() ?? "none");
 
         HttpResponseMessage response;
 

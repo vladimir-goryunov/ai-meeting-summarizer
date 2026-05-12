@@ -1,5 +1,5 @@
-﻿// Copyright (c) 2026 Vladimir Goryunov https://github.com/vladimir-goryunov
-// Licensed under the MIT License. See LICENSE in the project root for license information.
+﻿// Copyright (c) 2026 Vladimir Goryunov
+// SPDX-License-Identifier: MIT
 
 using System.ComponentModel.DataAnnotations;
 
@@ -33,8 +33,23 @@ public sealed class OllamaSettings
     /// <summary>
     /// HTTP request timeout in seconds.
     /// Minimum 5 seconds, maximum 600 seconds (10 minutes).
-    /// Increase for slow hardware or large transcripts.
     /// </summary>
     [Range(5, 600, ErrorMessage = "Ollama:TimeoutSeconds must be between 5 and 600.")]
     public int TimeoutSeconds { get; init; } = 180;
+
+    /// <summary>
+    /// Sampling temperature controlling response randomness (0.0–1.0).
+    /// 0.0 = fully deterministic (requires <see cref="Seed"/> to be set for strict reproducibility).
+    /// Higher values produce more varied output; lower values produce more consistent output.
+    /// </summary>
+    [Range(0.0, 1.0, ErrorMessage = "Ollama:Temperature must be between 0.0 and 1.0.")]
+    public double Temperature { get; init; } = 0.0;
+
+    /// <summary>
+    /// Random seed for deterministic generation.
+    /// When combined with <see cref="Temperature"/> = 0.0, the same transcript will always
+    /// produce the same summary and evaluation score across runs.
+    /// Set to null to disable fixed seeding (non-reproducible output).
+    /// </summary>
+    public int? Seed { get; init; } = 42;
 }

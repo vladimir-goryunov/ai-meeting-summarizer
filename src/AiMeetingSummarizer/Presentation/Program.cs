@@ -1,5 +1,5 @@
-﻿// Copyright (c) 2026 Vladimir Goryunov https://github.com/vladimir-goryunov
-// Licensed under the MIT License. See LICENSE in the project root for license information.
+﻿// Copyright (c) 2026 Vladimir Goryunov
+// SPDX-License-Identifier: MIT
 
 using CommandLine;
 
@@ -11,7 +11,6 @@ namespace AiMeetingSummarizer.Presentation;
 /// </summary>
 public class Program
 {
-
     /// <summary>
     /// The main entry point of the application.
     /// Parses command-line arguments using CommandLineParser library and executes the appropriate workflow.
@@ -23,8 +22,11 @@ public class Program
     /// 1 - Parse error or invalid arguments
     /// 2 - Operation cancelled by user
     /// 3 - Input file not found
-    /// 4 - Ollama service error
+    /// 4 - Ollama service error during inference
     /// 5 - Unexpected error
+    /// 6 - Ollama not reachable (pre-flight)
+    /// 7 - Ollama model not installed (pre-flight)
+    /// 8 - Invalid configuration (appsettings.json)
     /// </returns>
     public static async Task<int> Main(string[] args)
     {

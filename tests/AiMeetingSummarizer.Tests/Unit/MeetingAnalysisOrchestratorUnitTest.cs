@@ -1,5 +1,5 @@
-﻿// Copyright (c) 2026 Vladimir Goryunov https://github.com/vladimir-goryunov
-// Licensed under the MIT License. See LICENSE in the project root for license information.
+﻿// Copyright (c) 2026 Vladimir Goryunov
+// SPDX-License-Identifier: MIT
 
 using AiMeetingSummarizer.Application;
 using AiMeetingSummarizer.Application.Interfaces;
@@ -11,10 +11,6 @@ using Xunit;
 
 namespace AiMeetingSummarizer.Tests.Unit;
 
-/// <summary>
-/// Verifies the orchestration pipeline: correct delegation to each stage
-/// and correct data flow between stages.
-/// </summary>
 public sealed class MeetingAnalysisOrchestratorUnitTest
 {
     private const string InputPath = "/some/path/meeting.txt";
@@ -100,8 +96,26 @@ public sealed class MeetingAnalysisOrchestratorUnitTest
         await _sut.RunAsync(InputPath);
 
         _outputWriter.Verify(
-            x => x.WriteAsync(DefaultSummary, DefaultEvaluation, It.IsAny<CancellationToken>()),
+            x => x.WriteAsync(
+                DefaultSummary,
+                DefaultEvaluation,
+                It.IsAny<RunStatistics>(),
+                It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task RunAsync_PassesNonNullStatisticsToOutputWriter()
+    {
+        RunStatistics? capturedStats = null;
+
+        SetupHappyPath(captureStats: s => capturedStats = s);
+
+        await _sut.RunAsync(InputPath);
+
+        capturedStats.Should().NotBeNull();
+        capturedStats!.SummarizationDuration.Should().BeGreaterThanOrEqualTo(TimeSpan.Zero);
+        capturedStats.EvaluationDuration.Should().BeGreaterThanOrEqualTo(TimeSpan.Zero);
     }
 
     [Fact]
@@ -140,7 +154,7 @@ public sealed class MeetingAnalysisOrchestratorUnitTest
             .WithMessage("Connection refused");
     }
 
-    private void SetupHappyPath()
+    private void SetupHappyPath(Action<RunStatistics>? captureStats = null)
     {
         _inputProvider
             .Setup(x => x.ReadAsync(InputPath, It.IsAny<CancellationToken>()))
@@ -159,7 +173,13 @@ public sealed class MeetingAnalysisOrchestratorUnitTest
             .ReturnsAsync(DefaultEvaluation);
 
         _outputWriter
-            .Setup(x => x.WriteAsync(DefaultSummary, DefaultEvaluation, It.IsAny<CancellationToken>()))
+            .Setup(x => x.WriteAsync(
+                DefaultSummary,
+                DefaultEvaluation,
+                It.IsAny<RunStatistics>(),
+                It.IsAny<CancellationToken>()))
+            .Callback<SummaryResult, EvaluationResult, RunStatistics, CancellationToken>(
+                (_, _, stats, _) => captureStats?.Invoke(stats))
             .Returns(Task.CompletedTask);
     }
 }

@@ -1,5 +1,5 @@
-﻿// Copyright (c) 2026 Vladimir Goryunov https://github.com/vladimir-goryunov
-// Licensed under the MIT License. See LICENSE in the project root for license information.
+﻿// Copyright (c) 2026 Vladimir Goryunov
+// SPDX-License-Identifier: MIT
 
 using AiMeetingSummarizer.Application;
 using AiMeetingSummarizer.Infrastructure;
@@ -9,8 +9,9 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Console;
 using Microsoft.Extensions.Options;
+using Serilog;
+using Serilog.Events;
 
 namespace AiMeetingSummarizer.Presentation;
 
@@ -70,11 +71,9 @@ public class ApplicationBootstrapper : IAsyncDisposable
             if (!healthResult.IsHealthy)
             {
                 Console.Error.WriteLine(healthResult.ErrorMessage);
-
-                if (!healthResult.IsOllamaReachable)
-                    return ExitCode.OllamaNotReachable;
-
-                return ExitCode.OllamaModelNotFound;
+                return healthResult.IsOllamaReachable
+                    ? ExitCode.OllamaModelNotFound
+                    : ExitCode.OllamaNotReachable;
             }
 
             var orchestrator = _host.Services.GetRequiredService<MeetingAnalysisOrchestrator>();
@@ -122,6 +121,8 @@ public class ApplicationBootstrapper : IAsyncDisposable
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
+        Log.CloseAndFlush();
+
         if (_host is IAsyncDisposable asyncDisposable)
         {
             await asyncDisposable.DisposeAsync();
@@ -134,7 +135,6 @@ public class ApplicationBootstrapper : IAsyncDisposable
 
     private void ValidateConfiguration()
     {
-        // Eagerly resolve to trigger ValidateDataAnnotations before any work starts.
         _ = _host.Services.GetRequiredService<IOptions<OllamaSettings>>().Value;
         _ = _host.Services.GetRequiredService<IOptions<OutputSettings>>().Value;
     }
@@ -158,6 +158,9 @@ public class ApplicationBootstrapper : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Performs a pre-flight health check against the Ollama service.
+    /// </summary>
     private async Task<OllamaHealthCheckResult> RunHealthCheckAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("Checking Ollama availability...");
@@ -168,13 +171,30 @@ public class ApplicationBootstrapper : IAsyncDisposable
     private void PrintStartupInfo()
     {
         Console.WriteLine($"Input file: {_options.InputPath}");
-        Console.WriteLine($"Output file: {_options.OutputPath ?? "output.md (default)"}");
+        Console.WriteLine($"Output file: {_options.OutputPath ?? "summary.md (default)"}");
         Console.WriteLine("Starting meeting analysis...");
     }
 
     private static IHostBuilder CreateHostBuilder(CommandLineOptions options) =>
         Host.CreateDefaultBuilder()
             .UseContentRoot(AppContext.BaseDirectory)
+            .UseSerilog((context, _, loggerConfig) =>
+            {
+                var logFilePath = context.Configuration["Logging:FilePath"] ?? "logs/app-.log";
+                var minLevel = options.Verbose ? LogEventLevel.Debug : LogEventLevel.Information;
+
+                loggerConfig
+                    .MinimumLevel.Is(minLevel)
+                    .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+                    .MinimumLevel.Override("System", LogEventLevel.Warning)
+                    .WriteTo.Console(
+                        outputTemplate: "{Timestamp:HH:mm:ss} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
+                    .WriteTo.File(
+                        path: logFilePath,
+                        rollingInterval: RollingInterval.Day,
+                        retainedFileCountLimit: 7,
+                        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {SourceContext} {Message:lj}{NewLine}{Exception}");
+            })
             .ConfigureAppConfiguration((context, config) =>
             {
                 config.SetBasePath(AppContext.BaseDirectory);
@@ -189,27 +209,6 @@ public class ApplicationBootstrapper : IAsyncDisposable
                 services.AddInfrastructure(context.Configuration);
 
                 if (!string.IsNullOrWhiteSpace(options.OutputPath))
-                {
                     services.PostConfigure<OutputSettings>(opts => opts.FilePath = options.OutputPath);
-                }
-            })
-            .ConfigureLogging((context, logging) =>
-            {
-                logging.ClearProviders();
-                logging.AddSimpleConsole(consoleOptions =>
-                {
-                    consoleOptions.SingleLine = true;
-                    consoleOptions.TimestampFormat = "HH:mm:ss ";
-                    if (options.NoColor)
-                    {
-                        consoleOptions.ColorBehavior = LoggerColorBehavior.Disabled;
-                    }
-                });
-
-                if (!options.Verbose)
-                {
-                    logging.AddFilter("Microsoft", LogLevel.Warning);
-                    logging.AddFilter("System", LogLevel.Warning);
-                }
             });
 }

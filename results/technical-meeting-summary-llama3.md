@@ -1,7 +1,7 @@
 # Meeting Summary
 
 - *Generated: 2026-05-10 22:46:36 +03:00*
-- *Model: llama3:latest*
+- *Transcript: ..\samples\sample-technical-meeting.json*
 
 ---
 
@@ -53,3 +53,14 @@ The summary covers the main topics discussed in the meeting, but misses some det
 
 - Include Anna's contribution about frontend being done and backend still needing work
 - Add John as an action item owner for investigation and improving tests
+
+---
+
+## Run Statistics
+
+| | |
+|---|---|
+| Model | `llama3:latest` |
+| Summarization | 31,2s |
+| Evaluation | 34,3s |
+| Total inference | 65,5s |

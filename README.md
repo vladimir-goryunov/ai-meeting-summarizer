@@ -5,7 +5,8 @@
 ![Ollama](https://img.shields.io/badge/Ollama-000000?logo=ollama&logoColor=white)
 ![License MIT](https://img.shields.io/badge/License-MIT-green.svg)
 
-A .NET 8 console application that automatically generates structured summaries from meeting transcripts using a local large language model via [Ollama](https://ollama.com). All processing happens locally — no data leaves your machine.
+A small console application in C# .NET 8, which automatically generates structured summaries from meeting minutes using a local large language model via [Ollama](https://ollama.com). 
+All processing happens locally, no data leaves your machine.
 
 ## Features
 
@@ -14,19 +15,19 @@ A .NET 8 console application that automatically generates structured summaries f
 - Evaluates summary quality using an LLM-as-a-Judge approach with a five-criterion rubric
 - Pre-flight health check: verifies Ollama is running and the model is installed before processing begins
 - Outputs results to both the console and a Markdown file
-- Fully local inference — suitable for NDA-sensitive content
+- Fully local inference (suitable for NDA-sensitive content)
 
 ## Project Structure
 
 The solution follows Clean Architecture.
-Logical layers are namespaces within a single project — no separate assembly per layer.
+Logical layers are namespaces within a single project, no separate assembly per layer.
 
 ```
 AiMeetingSummarizer/
 │
 ├── src/AiMeetingSummarizer/
 │   │
-│   ├── Domain/                         # Core models — no dependencies on other layers
+│   ├── Domain/                         # Core models: no dependencies on other layers
 │   │
 │   ├── Application/
 │   │   └── Interfaces/                 # Contracts: ISummarizer, IEvaluator, IOutputWriter, …
@@ -42,7 +43,7 @@ AiMeetingSummarizer/
 │   └── Presentation/                   # Entry point, CLI parsing, bootstrapper, exit codes
 │
 ├── tests/AiMeetingSummarizer.Tests/
-│   └── Unit/                           # Fast, isolated unit tests — no network, no disk I/O
+│   └── Unit/                           # Fast, isolated unit tests: no network, no disk I/O
 │
 ├── results/                            # Sample runs with different models (llama3, phi4, qwen2.5)
 │

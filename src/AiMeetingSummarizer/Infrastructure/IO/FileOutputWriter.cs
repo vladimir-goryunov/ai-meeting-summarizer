@@ -1,44 +1,59 @@
-﻿// Copyright (c) 2026 Vladimir Goryunov https://github.com/vladimir-goryunov
-// Licensed under the MIT License. See LICENSE in the project root for license information.
+﻿// Copyright (c) 2026 Vladimir Goryunov
+// SPDX-License-Identifier: MIT
 
 using AiMeetingSummarizer.Application.Interfaces;
 using AiMeetingSummarizer.Domain;
+using AiMeetingSummarizer.Infrastructure.Ollama;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace AiMeetingSummarizer.Infrastructure.IO;
 
 /// <summary>
-/// Writes the meeting summary and quality evaluation to a Markdown file.
+/// Writes the meeting summary, quality evaluation, and run statistics to a Markdown file.
 /// Creates the output directory if it doesn't exist and handles file write permissions.
 /// </summary>
 public sealed class FileOutputWriter : IOutputWriter
 {
-    private readonly OutputSettings _settings;
+    private readonly OutputSettings _outputSettings;
+    private readonly OllamaSettings _ollamaSettings;
     private readonly ILogger<FileOutputWriter> _logger;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="FileOutputWriter"/> class.
     /// </summary>
-    /// <param name="settings">Configuration settings including output file path.</param>
+    /// <param name="outputSettings">Configuration settings including output file path.</param>
+    /// <param name="ollamaSettings">Ollama configuration used to display the model name in the statistics section.</param>
     /// <param name="logger">Logger for file write operations and errors.</param>
-    public FileOutputWriter(IOptions<OutputSettings> settings, ILogger<FileOutputWriter> logger)
+    public FileOutputWriter(
+        IOptions<OutputSettings> outputSettings,
+        IOptions<OllamaSettings> ollamaSettings,
+        ILogger<FileOutputWriter> logger)
     {
-        _settings = settings.Value;
+        _outputSettings = outputSettings.Value;
+        _ollamaSettings = ollamaSettings.Value;
         _logger = logger;
     }
 
     /// <inheritdoc />
-    public async Task WriteAsync(SummaryResult summary, EvaluationResult evaluation, CancellationToken cancellationToken = default)
+    public async Task WriteAsync(
+        SummaryResult summary,
+        EvaluationResult evaluation,
+        RunStatistics statistics,
+        CancellationToken cancellationToken = default)
     {
-        var markdown = BuildMarkdown(summary, evaluation);
+        var markdown = BuildMarkdown(summary, evaluation, statistics, _ollamaSettings.ModelName);
 
-        await File.WriteAllTextAsync(_settings.FilePath, markdown, cancellationToken);
+        await File.WriteAllTextAsync(_outputSettings.FilePath, markdown, cancellationToken);
 
-        _logger.LogInformation("Output written to: {FilePath}", Path.GetFullPath(_settings.FilePath));
+        _logger.LogInformation("Output written to: {FilePath}", Path.GetFullPath(_outputSettings.FilePath));
     }
 
-    private static string BuildMarkdown(SummaryResult summary, EvaluationResult evaluation)
+    private static string BuildMarkdown(
+        SummaryResult summary,
+        EvaluationResult evaluation,
+        RunStatistics statistics,
+        string modelName)
     {
         var sb = new System.Text.StringBuilder();
 
@@ -52,7 +67,7 @@ public sealed class FileOutputWriter : IOutputWriter
         sb.AppendLine();
         sb.AppendLine("---");
         sb.AppendLine();
-        sb.AppendLine("## Meeting Summary Quality Evaluation");
+        sb.AppendLine("## Quality Evaluation");
         sb.AppendLine();
         sb.AppendLine("| Criterion | Score | Comment |");
         sb.AppendLine("|---|---|---|");
@@ -77,6 +92,18 @@ public sealed class FileOutputWriter : IOutputWriter
                 sb.AppendLine($"- {improvement}");
             }
         }
+
+        sb.AppendLine();
+        sb.AppendLine("---");
+        sb.AppendLine();
+        sb.AppendLine("## Run Statistics");
+        sb.AppendLine();
+        sb.AppendLine("| | |");
+        sb.AppendLine("|---|---|");
+        sb.AppendLine($"| Model | `{modelName}` |");
+        sb.AppendLine($"| Summarization | {statistics.SummarizationDuration.TotalSeconds:0.0}s |");
+        sb.AppendLine($"| Evaluation | {statistics.EvaluationDuration.TotalSeconds:0.0}s |");
+        sb.AppendLine($"| Total inference | {statistics.TotalDuration.TotalSeconds:0.0}s |");
 
         return sb.ToString();
     }
