@@ -57,6 +57,12 @@ internal sealed record GenerateRequest
     public required string Prompt { get; init; }
 
     /// <summary>
+    /// Gets or sets the system prompt text for the model to complete.
+    /// </summary>
+    [JsonPropertyName("system")]
+    public required string System { get; init; }
+
+    /// <summary>
     /// Gets or sets a value indicating whether the response should be streamed as Server-Sent Events (SSE).
     /// When set to true, responses are delivered incrementally as tokens are generated.
     /// When false, the complete response is returned in a single JSON object.
@@ -192,7 +198,7 @@ internal sealed record GenerateResponse
     /// <value>The complete generated text response.</value>
     /// <remarks>
     /// For evaluations, this field should contain a JSON string that can be parsed into
-    /// an <see cref="EvaluationMeetingResponse"/> object.
+    /// an <see cref="EvaluationResponse"/> object.
     /// 
     /// For summaries, this field should contain formatted Markdown text.
     /// 

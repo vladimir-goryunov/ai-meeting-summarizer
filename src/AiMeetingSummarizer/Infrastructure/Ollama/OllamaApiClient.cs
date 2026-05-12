@@ -15,21 +15,34 @@ namespace AiMeetingSummarizer.Infrastructure.Ollama;
 public interface IOllamaApiClient
 {
     /// <summary>
-    /// Sends a prompt to the configured model and returns the generated response text.
+    /// Sends a generation request to the configured model and returns the response text.
     /// </summary>
-    /// <param name="prompt">The full prompt to send.</param>
+    /// <param name="systemPrompt">
+    /// Role definition, behavioural rules, and output format instructions.
+    /// Kept separate from <paramref name="userPrompt"/> so RLHF fine-tuned models
+    /// (llama3, qwen, phi4) apply maximum compliance to the instructions.
+    /// This value is static and does not change between calls.
+    /// </param>
+    /// <param name="userPrompt">
+    /// The concrete data for this request: transcript text, generated summary, etc.
+    /// Changes with every call.
+    /// </param>
     /// <param name="cancellationToken">Token to cancel the operation.</param>
     /// <returns>The raw text response from the model.</returns>
-    Task<string> GenerateAsync(string prompt, CancellationToken cancellationToken = default);
+    Task<string> GenerateAsync(
+        string systemPrompt,
+        string userPrompt,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>
-/// HTTP-based implementation of <see cref="IOllamaApiClient"/> targeting the Ollama /api/generate endpoint.
-/// Handles HTTP communication, request serialization, and response deserialization.
+/// HTTP-based implementation of <see cref="IOllamaApiClient"/> targeting
+/// the Ollama <c>/api/generate</c> endpoint.
 /// </summary>
 /// <remarks>
-/// Implements retry logic for transient failures and timeout handling.
-/// Configured via OllamaSettings which can be overridden by command-line arguments.
+/// Translates the two-part prompt (system + user) into the corresponding
+/// Ollama API request fields and handles all HTTP-level errors with
+/// actionable exception messages.
 /// </remarks>
 public sealed class OllamaApiClient : IOllamaApiClient
 {
@@ -45,9 +58,9 @@ public sealed class OllamaApiClient : IOllamaApiClient
     /// <summary>
     /// Initializes a new instance of the <see cref="OllamaApiClient"/> class.
     /// </summary>
-    /// <param name="httpClient">Configured HTTP client with base address and timeouts.</param>
-    /// <param name="settings">Ollama configuration including model name and endpoint URL.</param>
-    /// <param name="logger">Logger for request/response diagnostics and errors.</param>
+    /// <param name="httpClient">Configured HTTP client with Ollama base address and timeout.</param>
+    /// <param name="settings">Ollama configuration: model name, temperature, seed, base URL.</param>
+    /// <param name="logger">Logger for request/response diagnostics.</param>
     public OllamaApiClient(
         HttpClient httpClient,
         IOptions<OllamaSettings> settings,
@@ -59,12 +72,16 @@ public sealed class OllamaApiClient : IOllamaApiClient
     }
 
     /// <inheritdoc />
-    public async Task<string> GenerateAsync(string prompt, CancellationToken cancellationToken = default)
+    public async Task<string> GenerateAsync(
+        string systemPrompt,
+        string userPrompt,
+        CancellationToken cancellationToken = default)
     {
         var request = new GenerateRequest
         {
             Model = _settings.ModelName,
-            Prompt = prompt,
+            System = systemPrompt,
+            Prompt = userPrompt,
             Stream = false,
             Options = new GenerateOptions
             {
@@ -82,8 +99,7 @@ public sealed class OllamaApiClient : IOllamaApiClient
 
         try
         {
-            response = await _httpClient.PostAsJsonAsync(
-                "/api/generate", request, cancellationToken);
+            response = await _httpClient.PostAsJsonAsync("/api/generate", request, cancellationToken);
         }
         catch (HttpRequestException ex)
         {
@@ -103,7 +119,8 @@ public sealed class OllamaApiClient : IOllamaApiClient
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
             throw new OllamaException(
                 $"Ollama returned HTTP {(int)response.StatusCode}: {body}. " +
-                $"Ensure the model '{_settings.ModelName}' is installed (run: ollama pull {_settings.ModelName}).");
+                $"Ensure the model '{_settings.ModelName}' is installed " +
+                $"(run: ollama pull {_settings.ModelName}).");
         }
 
         var generateResponse = await response.Content.ReadFromJsonAsync<GenerateResponse>(

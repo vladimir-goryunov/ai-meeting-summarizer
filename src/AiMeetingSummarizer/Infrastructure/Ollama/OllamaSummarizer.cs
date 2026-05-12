@@ -8,48 +8,40 @@ using Microsoft.Extensions.Logging;
 namespace AiMeetingSummarizer.Infrastructure.Ollama;
 
 /// <summary>
-/// Generates structured meeting summaries by sending the transcript to a local Ollama model.
+/// Generates structured meeting summaries by sending a transcript to a local Ollama model.
 /// </summary>
 public sealed class OllamaSummarizer : ISummarizer
 {
-    private static readonly string PromptTemplate;
     private readonly IOllamaApiClient _apiClient;
+    private readonly string _systemPrompt;
     private readonly ILogger<OllamaSummarizer> _logger;
-        
-    static OllamaSummarizer()
-    {
-        var assembly = typeof(OllamaSummarizer).Assembly;
-        var resourceNames = assembly.GetManifestResourceNames();
-        var resourceName = resourceNames.FirstOrDefault(r => r.Contains("SummarizerPrompt"));
-        if (resourceName == null)
-        {
-            var availableResources = string.Join(", ", resourceNames);
-            throw new InvalidOperationException(
-                $"Resource 'SummarizerPrompt.txt' not found. Available resources: {availableResources}");
-        }
-
-        using var stream = assembly.GetManifestResourceStream(resourceName);
-        if (stream == null)
-        {
-            throw new InvalidOperationException($"Resource '{resourceName}' found but could not be loaded");
-        }
-
-        using var reader = new StreamReader(stream);
-        PromptTemplate = reader.ReadToEnd();
-    }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="OllamaSummarizer"/> class.
     /// </summary>
-    /// <param name="apiClient">HTTP client for communicating with Ollama API.</param>
-    /// <param name="logger">Logger for diagnostic information during evaluation.</param>
-    public OllamaSummarizer(IOllamaApiClient apiClient, ILogger<OllamaSummarizer> logger)
+    /// <param name="apiClient">Ollama API client used to send generation requests.</param>
+    /// <param name="systemPrompt">
+    /// Pre-loaded system prompt text from <c>SummarizerPrompt.txt</c>.
+    /// Injected by the DI container via <see cref="PromptLoader"/>.
+    /// </param>
+    /// <param name="logger">Logger for request diagnostics.</param>
+    public OllamaSummarizer(
+        IOllamaApiClient apiClient,
+        string systemPrompt,
+        ILogger<OllamaSummarizer> logger)
     {
         _apiClient = apiClient;
+        _systemPrompt = systemPrompt;
         _logger = logger;
     }
 
     /// <inheritdoc />
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="transcript"/> is null, empty, or whitespace.
+    /// </exception>
+    /// <exception cref="OllamaException">
+    /// Thrown when the Ollama service is unreachable, times out, or returns an error response.
+    /// </exception>
     public async Task<SummaryResult> SummarizeAsync(string transcript, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(transcript))
@@ -57,11 +49,12 @@ public sealed class OllamaSummarizer : ISummarizer
             throw new ArgumentException("Transcript must not be empty.", nameof(transcript));
         }
 
-        var prompt = PromptTemplate.Replace("{{TRANSCRIPT}}", transcript);
+        // User prompt carries only the variable data; rules and format are in the system prompt.
+        var userPrompt = $"TRANSCRIPT:\n{transcript}";
 
-        _logger.LogDebug("Sending summarization prompt. Transcript length: {Length}", transcript.Length);
+        _logger.LogDebug("Sending summarization request. Transcript length: {Length}", transcript.Length);
 
-        var content = await _apiClient.GenerateAsync(prompt, cancellationToken);
+        var content = await _apiClient.GenerateAsync(_systemPrompt, userPrompt, cancellationToken);
 
         return new SummaryResult
         {

@@ -9,7 +9,7 @@ namespace AiMeetingSummarizer.Infrastructure.Ollama.Models;
 /// Represents the serializable response structure from the Ollama evaluation API.
 /// Contains scores and feedback for all five evaluation criteria.
 /// </summary>
-internal sealed class EvaluationMeetingResponse
+internal sealed class EvaluationResponse
 {
     /// <summary>Score and comment for content completeness (0-2)</summary>
     [JsonPropertyName("completeness")]

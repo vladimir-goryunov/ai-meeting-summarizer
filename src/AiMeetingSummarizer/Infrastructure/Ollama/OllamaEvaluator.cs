@@ -11,74 +11,83 @@ using Microsoft.Extensions.Logging;
 namespace AiMeetingSummarizer.Infrastructure.Ollama;
 
 /// <summary>
-/// Evaluates summary quality using an LLM-as-a-Judge approach.
-/// The model scores the summary against the original transcript across five criteria.
+/// Evaluates meeting summary quality using an LLM-as-a-Judge approach.
 /// </summary>
+/// <remarks>
+/// <para>
+/// The prompt is split into system and user parts: scoring rules travel as the system prompt,
+/// transcript and summary as the user prompt.
+/// The system prompt text is loaded from <c>Infrastructure/Templates/EvaluatorPrompt.txt</c>
+/// at application startup and injected via constructor, so it can be edited without recompiling.
+/// If the model returns a response that cannot be parsed as JSON, a fallback
+/// <see cref="EvaluationResult"/> with all scores set to 0 is returned instead of throwing.
+/// </para>
+/// </remarks>
 public sealed class OllamaEvaluator : IEvaluator
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true
     };
-    private static readonly string PromptTemplate;
+
     private readonly IOllamaApiClient _apiClient;
+    private readonly string _systemPrompt;
     private readonly ILogger<OllamaEvaluator> _logger;
-
-    static OllamaEvaluator()
-    {
-        var assembly = typeof(OllamaEvaluator).Assembly;
-        var resourceNames = assembly.GetManifestResourceNames();
-        var resourceName = resourceNames.FirstOrDefault(r => r.Contains("EvaluatorPrompt"));
-        if (resourceName == null)
-        {
-            var availableResources = string.Join(", ", resourceNames);
-            throw new InvalidOperationException(
-                $"Resource 'EvaluatorPrompt.txt' not found. Available resources: {availableResources}");
-        }
-
-        using var stream = assembly.GetManifestResourceStream(resourceName);
-        if (stream == null)
-        {
-            throw new InvalidOperationException($"Resource '{resourceName}' found but could not be loaded");
-        }
-
-        using var reader = new StreamReader(stream);
-        PromptTemplate = reader.ReadToEnd();
-    }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="OllamaEvaluator"/> class.
     /// </summary>
-    /// <param name="apiClient">HTTP client for communicating with Ollama API.</param>
-    /// <param name="logger">Logger for diagnostic information during evaluation.</param>
-    public OllamaEvaluator(IOllamaApiClient apiClient, ILogger<OllamaEvaluator> logger)
+    /// <param name="apiClient">Ollama API client used to send generation requests.</param>
+    /// <param name="systemPrompt">
+    /// Pre-loaded system prompt text from <c>EvaluatorPrompt.txt</c>.
+    /// Injected by the DI container via <see cref="PromptLoader"/>.
+    /// </param>
+    /// <param name="logger">Logger for request diagnostics and JSON parse failures.</param>
+    public OllamaEvaluator(
+        IOllamaApiClient apiClient,
+        string systemPrompt,
+        ILogger<OllamaEvaluator> logger)
     {
         _apiClient = apiClient;
+        _systemPrompt = systemPrompt;
         _logger = logger;
     }
 
     /// <inheritdoc />
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="transcript"/> or <paramref name="summary"/> is null, empty, or whitespace.
+    /// </exception>
+    /// <exception cref="OllamaException">
+    /// Thrown when the Ollama service is unreachable, times out, or returns an error response.
+    /// </exception>
     public async Task<EvaluationResult> EvaluateAsync(
         string transcript,
         string summary,
         CancellationToken cancellationToken = default)
     {
+
         if (string.IsNullOrWhiteSpace(transcript))
         {
             throw new ArgumentException("Transcript must not be empty.", nameof(transcript));
         }
         if (string.IsNullOrWhiteSpace(summary))
         {
-            throw new ArgumentException("Summary must not be empty.", nameof(summary));
+            throw new ArgumentException("Summary1 must not be empty.", nameof(summary));
         }
 
-        var prompt = PromptTemplate
-            .Replace("{{TRANSCRIPT}}", transcript)
-            .Replace("{{SUMMARY}}", summary);
+        // User prompt carries only the variable data; scoring rules are in the system prompt.
+        var userPrompt =
+            $"""
+             ORIGINAL TRANSCRIPT:
+             {transcript}
 
-        _logger.LogDebug("Sending evaluation prompt to Ollama");
+             GENERATED SUMMARY:
+             {summary}
+             """;
 
-        var rawResponse = await _apiClient.GenerateAsync(prompt, cancellationToken);
+        _logger.LogDebug("Sending evaluation request to Ollama");
+
+        var rawResponse = await _apiClient.GenerateAsync(_systemPrompt, userPrompt, cancellationToken);
 
         return ParseEvaluationResponse(rawResponse);
     }
@@ -88,27 +97,20 @@ public sealed class OllamaEvaluator : IEvaluator
         var parsed = TryDeserialize(rawResponse)
                      ?? TryDeserialize(ExtractJsonBlock(rawResponse));
 
-        if (parsed is null)
-        {
-            _logger.LogWarning(
-                "Could not parse evaluation JSON from model response. Returning fallback evaluation.");
+        if (parsed is not null)
+            return MapToEvaluationResult(parsed); // ← компилятор гарантированно знает: non-null
 
-            return CreateFallbackResult("Evaluation could not be parsed from the model response.");
-        }
-
-        return MapToEvaluationResult(parsed);
+        _logger.LogWarning("Could not parse evaluation JSON. Returning fallback evaluation.");
+        return CreateFallbackResult("Evaluation could not be parsed from the model response.");
     }
 
-    private static EvaluationMeetingResponse? TryDeserialize(string? json)
+    private static EvaluationResponse? TryDeserialize(string? json)
     {
         if (string.IsNullOrWhiteSpace(json))
-        {
             return null;
-        }
-
         try
         {
-            return JsonSerializer.Deserialize<EvaluationMeetingResponse>(json, JsonOptions);
+            return JsonSerializer.Deserialize<EvaluationResponse>(json, JsonOptions);
         }
         catch (JsonException)
         {
@@ -122,7 +124,7 @@ public sealed class OllamaEvaluator : IEvaluator
         return match.Success ? match.Value : null;
     }
 
-    private static EvaluationResult MapToEvaluationResult(EvaluationMeetingResponse response)
+    private static EvaluationResult MapToEvaluationResult(EvaluationResponse response)
     {
         static EvaluationScore ToScore(CriterionScore? criterion, string fallback)
             => new(
