@@ -240,6 +240,21 @@ Settings are controlled via `appsettings.json`:
 
 The `--output` CLI argument takes priority over `Output:FilePath` in `appsettings.json`.
 
+## Ensuring Reproducible Results
+
+For consistent and repeatable summary generation, especially with `qwen2.5:7b-instruct` on local Ollama installations, follow these recommendations:
+
+1.  **Ollama Restart:** It is highly recommended to restart the Ollama service completely before each run or a series of runs where reproducibility is critical. This helps clear internal states and caches that might otherwise lead to slightly varying outputs.
+    *   **On Windows:** Use `Ctrl+C` in the terminal where `ollama serve` is running, or "End Task" for `ollama.exe` in Task Manager.
+    
+2.  **Configuration Settings:** Ensure the following parameters are set in your `appsettings.json`:
+    *   `"Ollama": { "Temperature": 0.1, "Seed": 42 }`
+    *   `Temperature`: Setting this value to `0.1` (or a very low non-zero value like `0.05`) helps in getting more consistent responses while still allowing a tiny bit of flexibility for the model to choose optimal tokens. A `Temperature` of `0.0` might seem ideal for determinism, but in practice, `0.1` often works better for consistency in some local LLM setups.
+    *   `Seed`: A fixed `Seed` value (e.g., `42`) initializes the random number generator used by the model, further contributing to reproducible outputs.
+
+> **Troubleshooting:** If you experience inconsistent results despite these settings, perform a full Ollama service restart.
+
+
 ## Running Tests
 
 ```bash
